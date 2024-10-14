@@ -1,0 +1,326 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Script Reader</title>
+	  <meta name="viewport" content="width=device-width, initial-scale=1">
+	     
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime&family=Lato:wght@100;400&display=swap" rel="stylesheet">
+    <style>
+		 
+html {
+    -webkit-font-smoothing: antialiased; /* For WebKit browsers like Safari and Chrome */
+    -moz-osx-font-smoothing: grayscale; /* For Firefox on Mac OS */
+    text-rendering: optimizeLegibility; /* Improve text rendering by using kerning and optional ligatures */
+}
+
+		  
+      body {
+        background-color: #444;
+        color: rgba(255,255,255, 0.7);
+        font-size: 17px;
+        font-family: 'Lato', sans-serif;
+		  font-weight: 400;
+        text-align: center;
+		  line-height: 1.5;
+        padding-top: 20px;
+		  padding-bottom: 20px;
+		 }
+
+	
+#fileInput {
+	display: none;
+}
+
+	hr {
+    background-color: rgb(144, 238, 144, 0.5);
+    border: none; /* Removes the default border */
+    height: 1px; /* Sets the thickness of the hr line */
+}
+
+		 #fileInputLabel {
+  background-color: #111;
+  color: #555;
+  font-size: 20px;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 5px;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+#fileInputLabel:hover {
+  background-color: #333;
+}
+
+
+		  #sceneCount {
+    background-color: #777;
+    color: #1e1e1e;
+    padding: 20px;
+    margin: 0 auto;
+    font-size: 17px;
+    margin-bottom: 20px;
+    text-align: center;
+    border-radius: 5px;
+	 text-transform: uppercase;
+    width: 625px;
+    letter-spacing: 2px;
+}
+
+		  #scriptContent {
+			display: none;
+      }
+
+		 .scene {
+			         white-space: normal;
+    background-color: #222; /* Dark background for each scene */
+    color: rgba(255,255,255,0.7); /* Light text color */
+    font-family: 'Lato', sans-serif; /* Font family */
+    text-align: left; /* Align text to the left */
+        margin: 30px auto;
+    padding: 20px; /* Padding inside each scene div */
+    border-radius: 5px; /* Rounded corners */
+    width: 625px; /* Fixed width */
+}
+
+
+
+		 
+		 .sceneHeading {
+    font-weight: bold;
+    font-size: 20px;
+    color: rgba(135, 206, 250, 0.6);
+    letter-spacing: 2px;
+    border-radius: 5px;
+    padding-left: 10px;
+    padding-right: 10px;
+    text-align: right;
+    background-color: rgba(0,0,0, 0.6);
+    margin-bottom: 15px;
+}
+
+		 .uppercase-word {
+    color: rgba(255, 165, 0, 0.7); /* Pale orange color with 0.7 opacity */
+			 font-weight: bold;
+}
+
+
+
+	@media screen and (max-width: 600px) {
+    .scene, #sceneCount {
+        box-sizing: border-box; 
+        width: calc(100%); /* Full width minus the padding */
+        font-size: 15px; /* Two sizes smaller */
+    }
+
+    .sceneHeading {
+        font-size: 18px; /* Adjust the font size as needed */
+    }
+}
+
+			 
+    </style>
+<script type="module">
+    import * as pdfjsLib from './build/pdf.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './build/pdf.worker.mjs';
+
+
+	
+    window.onload = () => {
+        document.getElementById('fileInput').addEventListener('change', event => {
+            const file = event.target.files[0];
+            if (file) {
+                const fileReader = new FileReader();
+                fileReader.onload = function() {
+                    const typedarray = new Uint8Array(this.result);
+
+                    pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                        console.log('PDF loaded');
+                        
+                        // Fetch each page
+                        const maxPages = pdf.numPages;
+                        const pageTexts = Array.apply(null, Array(maxPages)).map((_, pageIndex) => {
+                            return pdf.getPage(pageIndex + 1).then(page => {
+                                return page.getTextContent().then(textContent => {
+                                    let pageText = textContent.items.map(item => item.str).join(' ');
+
+// Insert hr before each "INT." or "EXT."
+pageText = pageText.replace(/(INT\.|EXT\.)/g, '<hr>$1 ');
+
+// First, handle the irregular ellipsis ".. ." by replacing it with a standard ellipsis "..."
+pageText = pageText.replace(/\.\. \./g, '...  ');
+
+// Now, standardize all ellipses to '...'
+// This regex targets three consecutive periods, ensuring they are not part of a larger sequence of periods
+pageText = pageText.replace(/(?<!\.)\.\.\.(?!\.)/g, '...  ');
+
+// Apply the line break rule for sentence-ending periods
+// This regex looks for a period followed by a space, but not part of an ellipsis
+pageText = pageText.replace(/(?<!\.\.)\.\s/g, '.<br>');
+
+// Apply line breaks after question marks and closing quotation marks
+pageText = pageText.replace(/\? /g, '?<br>');
+pageText = pageText.replace(/\.[\"”] /g, '.\"<br>');
+pageText = pageText.replace(/\?["”] /g, '?\"<br>');
+
+
+// Correct any instances where a line break might have been incorrectly inserted into an ellipsis
+pageText = pageText.replace(/\.<br>\.\./g, '...  ');
+
+
+
+// Handling "INT." and "EXT." to not follow with a new line
+// These lines may no longer be necessary if the double space insertion is adequate
+pageText = pageText.replace(/INT\.<br>/g, 'INT. ');
+pageText = pageText.replace(/EXT\.<br>/g, 'EXT. ');
+pageText = pageText.replace(/LT\.<br>/g, 'LT. ');
+pageText = pageText.replace(/CAPT\.<br>/g, 'CAPT. ');
+pageText = pageText.replace(/Lt\.<br>/g, 'Lt. ');
+
+pageText = pageText.replace(/Mr\.<br>/g, 'Mr. ');
+pageText = pageText.replace(/Ms\.<br>/g, 'Ms. ');
+pageText = pageText.replace(/Dr\.<br>/g, 'Dr. ');
+pageText = pageText.replace(/DR\.<br>/g, 'DR. ');
+											  
+pageText = pageText.replace(/\(MORE\)/g, '');
+
+
+
+// New rule: Insert a line break after uppercase sequences following "INT." or "EXT."
+// Update the "INT EXT" rule to allow for hyphens within location descriptions
+pageText = pageText.replace(/(INT\.|EXT\.)\s?[0-9A-Z '-.,]+\b(?! [A-Z0-9]\b)/g, '<div class="sceneHeading">$&</div>');
+
+
+											  
+return pageText;
+
+                                });
+                            });
+                        });
+
+                        // Combine texts from all pages
+                        Promise.all(pageTexts).then(texts => {
+                       
+    let combinedText = texts.join('<br><br>');
+									
+
+
+    // Remove standalone periods and page numbers
+    combinedText = combinedText.replace(/<br>\.\s*<br>/g, '<br>');
+    combinedText = combinedText.replace(/<br>\s*\d+\.\s*<br>/g, '<br>');
+
+    // Remove unwanted consecutive line breaks
+    combinedText = combinedText.replace(/<br>\s*<br>+/g, '<br>');
+
+
+	
+ // Split the text into scenes using <hr> as the delimiter
+                            const scenes = combinedText.split('<hr>');
+
+let isFirstScene = true;
+									
+                            // Clear the scriptContent div
+                            const scriptContentDiv = document.getElementById('scriptContent');
+                            scriptContentDiv.innerHTML = '';
+
+
+								 
+    scenes.forEach(scene => {
+        if (scene.trim() !== '') {
+            const sceneDiv = document.createElement('div');
+            sceneDiv.classList.add('scene');
+
+            // Extract sceneHeading and sceneText
+            let sceneHeadingContent = '';
+            let sceneTextContent = scene;
+
+            // If not the first scene, process as usual
+            if (!isFirstScene) {
+                const headingEndIndex = scene.indexOf('</div>', scene.indexOf('<div class="sceneHeading">')) + 6; // +6 to include '</div>'
+                sceneHeadingContent = scene.substring(0, headingEndIndex);
+                sceneTextContent = scene.substring(headingEndIndex);
+            }
+
+            // Add sceneHeading content to the sceneDiv
+            if (sceneHeadingContent) {
+                sceneDiv.innerHTML = sceneHeadingContent;
+            } else {
+                // Create an empty sceneHeading div for the first scene
+                const sceneHeadingDiv = document.createElement('div');
+                sceneHeadingDiv.classList.add('sceneHeading');
+                sceneDiv.appendChild(sceneHeadingDiv);
+            }
+
+            // Create a new div for sceneText and add it to the sceneDiv
+            const sceneTextDiv = document.createElement('div');
+            sceneTextDiv.classList.add('sceneText');
+            sceneTextDiv.innerHTML = sceneTextContent.trim(); // Add the text content
+
+            // New code to wrap uppercase words in spans
+            const regex = /\b([A-Z]{2,})\b/g; // Regular expression to match uppercase words
+            sceneTextDiv.innerHTML = sceneTextDiv.innerHTML.replace(regex, '<span class="uppercase-word">$1</span>');
+
+            sceneDiv.appendChild(sceneTextDiv);
+
+            scriptContentDiv.appendChild(sceneDiv); // Append the complete sceneDiv to the scriptContentDiv
+
+            // Set the flag to false after processing the first scene
+            isFirstScene = false;
+        }
+    });
+
+    // Display the scriptContent div
+    scriptContentDiv.style.display = 'block';
+
+
+									
+                            // Count the number of scenes
+                            const numberOfScenes = scenes.length - 1; // Adjust for any trailing split
+    
+            // Calculate the total word count
+            const wordCount = combinedText.split(/\s+/).filter(word => word.length > 0).length;
+
+                        const filenameWithoutExtension = file.name.replace(/\.pdf$/i, "").replace(/[^\w\s]/g, " ");
+
+
+									
+            // Display the scene count, page count, and word count
+            document.getElementById('sceneCount').innerHTML = `<b>${filenameWithoutExtension}</b><br>${numberOfScenes} scenes - ${maxPages} pages - ${wordCount} words`;
+									
+            document.getElementById('sceneCount').style.display = 'block'; // Make the scene count div visible
+
+
+
+                        });
+
+
+
+
+							  
+                    });
+                };
+
+					
+                fileReader.readAsArrayBuffer(file);
+					document.getElementById('fileInput').style.display = 'none';
+					document.getElementById('fileInputLabel').style.display = 'none';
+
+            }
+        });
+    };
+
+	
+</script>
+
+
+  </head>
+  <body>
+<label for="fileInput" id="fileInputLabel">Select Script</label>
+<input type="file" id="fileInput" accept=".pdf" />
+<div id="sceneCount" style="display: none;"></div>
+<div id="scriptContent"></div>
+  </body>
+</html>
